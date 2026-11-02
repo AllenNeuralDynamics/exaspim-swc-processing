@@ -38,6 +38,13 @@ DATA_PROCESS_FILENAME = "data_process.json"
 UPSTREAM_STAGES = ("dispatch", "refinement", "alignment", "final")
 """Stage directories that are passed along the chain, in pipeline order."""
 
+PROCESSED_DATASET_FILE = "processed_dataset.txt"
+"""Hand-off between stages, not published metadata.
+
+The transform writes the name of the processed dataset it applied here, in its
+``alignment/`` output; packaging reads it to find the parent dataset.
+"""
+
 
 def installed_version(distribution: str) -> str | None:
     """Return the installed version of a distribution, if it is installed.
