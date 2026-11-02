@@ -471,3 +471,52 @@ def reconcile(derived: VolumeGeometry, published: VolumeGeometry, volume: str) -
             f"Derived {volume} spacing {derived.spacing_mm} does not match the published "
             f"{published.spacing_mm}; the registration's geometry has changed"
         )
+
+
+TEMPLATE_TO_CCF_PATTERN = re.compile(r"/data/(reg_exaspim_template_to_ccf_[A-Za-z0-9_.]+?)/")
+"""A template-to-CCF data asset, as the registration names it in a mounted path."""
+
+
+def recorded_template_to_ccf(record: dict) -> str:
+    """Return the template-to-CCF asset the registration record says it used.
+
+    The registration names the asset only by the path it mounted it at. Records in the v2
+    schema list those paths in ``code.parameters.template_to_ccf_transforms``; records in
+    the v1 schema mention them only in a process's ``notes``. Both are read, and every
+    mention must name the same asset.
+
+    The answer is only as good as the record. Registrations run between 2025-10-06 and
+    the correction of their records mounted v1.5 at the ``..._v1.4`` path, so their
+    records say v1.4.
+
+    Parameters
+    ----------
+    record : dict
+        The decoded ``ccf_alignment/processing.json``.
+
+    Returns
+    -------
+    str
+        The asset's mount name, e.g. ``"reg_exaspim_template_to_ccf_25um_v1.5"``.
+
+    Raises
+    ------
+    RegistrationRecordError
+        If the record names no template-to-CCF asset, or names more than one.
+    """
+    processes = record.get("data_processes") or (record.get("processing_pipeline") or {}).get(
+        "data_processes", []
+    )
+    named: set[str] = set()
+    for process in processes:
+        parameters = (process.get("code") or {}).get("parameters") or process.get("parameters")
+        for path in (parameters or {}).get("template_to_ccf_transforms") or []:
+            named.update(TEMPLATE_TO_CCF_PATTERN.findall(f"{path}/"))
+        named.update(TEMPLATE_TO_CCF_PATTERN.findall(str(process.get("notes") or "")))
+    if not named:
+        raise RegistrationRecordError("The registration record names no template-to-CCF asset")
+    if len(named) > 1:
+        raise RegistrationRecordError(
+            f"The registration record names {len(named)} template-to-CCF assets: {sorted(named)}"
+        )
+    return named.pop()

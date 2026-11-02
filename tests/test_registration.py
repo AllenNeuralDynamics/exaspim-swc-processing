@@ -18,6 +18,7 @@ from exaspim_swc_processing.registration import (
     parse_nifti_geometry,
     parse_registration_record,
     reconcile,
+    recorded_template_to_ccf,
     registration_volume_key,
     resampled_geometry,
     zarr_level_key,
@@ -312,3 +313,33 @@ def test_candidates_are_tried_in_order() -> None:
 def test_no_dataset_name_yields_none() -> None:
     """A caller must be able to tell that nothing was found."""
     assert dataset_name("/scratch/reg_bundle", "") is None
+
+
+V1_FIXTURE = Path(__file__).parent / "resources" / "ccf_alignment_processing_v1.json"
+
+
+def test_the_template_asset_is_read_from_a_v2_record() -> None:
+    """826509's v2 record lists the asset in the pass parameters."""
+    assert recorded_template_to_ccf(_record()) == "reg_exaspim_template_to_ccf_25um_v1.4"
+
+
+def test_the_template_asset_is_read_from_a_v1_record() -> None:
+    """782644's v1 record names the asset only in a process's notes."""
+    record = json.loads(V1_FIXTURE.read_text(encoding="utf-8"))
+    assert recorded_template_to_ccf(record) == "reg_exaspim_template_to_ccf_25um_v1.4"
+
+
+def test_a_record_without_a_template_asset_is_refused() -> None:
+    """721828's record names none; nothing is guessed."""
+    record = {"processing_pipeline": {"data_processes": [{"name": "Image atlas alignment"}]}}
+    with pytest.raises(RegistrationRecordError, match="names no"):
+        recorded_template_to_ccf(record)
+
+
+def test_a_record_naming_two_template_assets_is_refused() -> None:
+    """A record that disagrees with itself cannot choose the transform."""
+    record = _record()
+    paths = record["data_processes"][0]["code"]["parameters"]["template_to_ccf_transforms"]
+    paths[0] = "/data/reg_exaspim_template_to_ccf_25um_v1.5/1Warp.nii.gz"
+    with pytest.raises(RegistrationRecordError, match="names 2"):
+        recorded_template_to_ccf(record)

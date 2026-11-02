@@ -1,0 +1,70 @@
+{
+   "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/processing.py",
+   "schema_version": "1.1.4",
+   "processing_pipeline": {
+      "data_processes": [
+         {
+            "name": "Image importing",
+            "software_version": "0.0.1",
+            "start_date_time": "2025-10-28T17:35:47.943068Z",
+            "end_date_time": "2025-10-28T17:35:50.397073Z",
+            "input_location": "s3://aind-open-data/exaSPIM_782644_2025-07-16_11-02-45_processed_2025-07-24_16-05-23/fusion/fused_ccf_ch.zarr/3",
+            "output_location": "s3://aind-open-data/exaSPIM_782644_2025-07-16_11-02-45_processed_2025-07-24_16-05-23/fusion/fused_ccf_ch.zarr/3",
+            "code_url": "https://github.com/AllenNeuralDynamics/aind-exaspim-ccf-registration.git",
+            "code_version": "0.0.1",
+            "parameters": {},
+            "outputs": {},
+            "notes": "Importing fused data for alignment",
+            "resources": null
+         },
+         {
+            "name": "Image atlas alignment",
+            "software_version": "0.0.1",
+            "start_date_time": "2025-10-28T17:35:50.398496Z",
+            "end_date_time": "2025-10-28T18:08:28.645945Z",
+            "input_location": "s3://aind-open-data/exaSPIM_782644_2025-07-16_11-02-45_processed_2025-07-24_16-05-23/fusion/fused_ccf_ch.zarr/3",
+            "output_location": "/tmp/nxf.xQWe4RBYT5/capsule/results/ccf_alignment/",
+            "code_url": "https://github.com/AllenNeuralDynamics/aind-exaspim-ccf-registration.git",
+            "code_version": "0.0.1",
+            "parameters": {},
+            "outputs": {},
+            "notes": "Template based registration: sample -> template -> CCF",
+            "resources": null
+         },
+         {
+            "name": "Image importing",
+            "software_version": "0.0.1",
+            "start_date_time": "2025-10-28T18:08:28.647378Z",
+            "end_date_time": "2025-10-28T18:08:43.967311Z",
+            "input_location": "s3://aind-open-data/exaSPIM_782644_2025-07-16_11-02-45_processed_2025-07-24_16-05-23/fusion/fused_ccf_ch.zarr/2",
+            "output_location": "s3://aind-open-data/exaSPIM_782644_2025-07-16_11-02-45_processed_2025-07-24_16-05-23/fusion/fused_ccf_ch.zarr/2",
+            "code_url": "https://github.com/AllenNeuralDynamics/aind-exaspim-ccf-registration.git",
+            "code_version": "0.0.1",
+            "parameters": {},
+            "outputs": {},
+            "notes": "Importing fused data for alignment",
+            "resources": null
+         },
+         {
+            "name": "Image atlas alignment",
+            "software_version": "0.0.1",
+            "start_date_time": "2025-10-28T18:08:43.968667Z",
+            "end_date_time": "2025-10-28T19:12:44.596424Z",
+            "input_location": "s3://aind-open-data/exaSPIM_782644_2025-07-16_11-02-45_processed_2025-07-24_16-05-23/fusion/fused_ccf_ch.zarr/2",
+            "output_location": "/tmp/nxf.xQWe4RBYT5/capsule/results/ccf_alignment/registration_metadata//782644_10um_to_ccf_moved.nii.gz",
+            "code_url": "https://github.com/AllenNeuralDynamics/aind-exaspim-ccf-registration.git",
+            "code_version": "0.0.1",
+            "parameters": {},
+            "outputs": {},
+            "notes": "Registering 10um sample to CCF using transforms: ['/tmp/nxf.xQWe4RBYT5/capsule/results/ccf_alignment/782644_to_exaSPIM_SyN_1Warp.nii.gz', '/tmp/nxf.xQWe4RBYT5/capsule/results/ccf_alignment/782644_to_exaSPIM_SyN_0GenericAffine.mat'] and ['/data/reg_exaspim_template_to_ccf_25um_v1.4/1Warp.nii.gz', '/data/reg_exaspim_template_to_ccf_25um_v1.4/0GenericAffine.mat']",
+            "resources": null
+         }
+      ],
+      "processor_full_name": "Di Wang",
+      "pipeline_version": "0.0.1",
+      "pipeline_url": "https://codeocean.allenneuraldynamics.org/capsule/1087961/tree",
+      "note": "Metadata for the CCF Atlas Registration step"
+   },
+   "analyses": [],
+   "notes": "This processing only contains metadata of ccf registration             and needs to be compiled with other steps at the end"
+}
