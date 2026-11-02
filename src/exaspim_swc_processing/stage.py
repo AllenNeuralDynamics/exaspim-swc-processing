@@ -12,13 +12,14 @@ than the commit the pipeline pinned. Both are read from the environment here, so
 reports the code that actually ran.
 
 A record carries only what the schema requires, plus the inputs the stage applied
-(``Code.input_data``). Lookup details belong in the run log, not the published record.
+(``Code.input_data``) and any named settings it is asked to record (``Code.parameters``).
+Lookup details belong in the run log, not the published record.
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from importlib import metadata
 from pathlib import Path
@@ -108,6 +109,7 @@ def build_stage_process(
     start_time: datetime,
     experimenters: Sequence[str] = (),
     input_data: Sequence[str] = (),
+    parameters: Mapping[str, object] | None = None,
     process_type: ProcessName = ProcessName.NEURON_SKELETON_PROCESSING,
 ) -> DataProcess:
     """Build the record describing one stage's work.
@@ -125,6 +127,8 @@ def build_stage_process(
         Who is responsible for the run.
     input_data : Sequence[str], optional
         URLs of the data the stage applied, recorded as ``Code.input_data``.
+    parameters : Mapping[str, object] | None, optional
+        Named settings worth recording even when empty, as ``Code.parameters``.
     process_type : ProcessName, optional
         Operation performed, by default ``NEURON_SKELETON_PROCESSING``.
 
@@ -133,11 +137,14 @@ def build_stage_process(
     DataProcess
         The stage record, ready to write with :func:`write_stage_process`.
     """
+    extra: dict[str, object] = {}
     if input_data:
-        code = Code.model_validate({
-            **code.model_dump(),
-            "input_data": [DataAsset(url=url) for url in input_data],
-        })
+        extra["input_data"] = [DataAsset(url=url) for url in input_data]
+    if parameters:
+        extra["parameters"] = dict(parameters)
+    if extra:
+        # Revalidated: model_copy would leave plain dicts where the schema expects models.
+        code = Code.model_validate({**code.model_dump(), **extra})
     return DataProcess(
         process_type=process_type,
         name=name,

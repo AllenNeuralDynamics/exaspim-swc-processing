@@ -102,6 +102,14 @@ def test_applied_inputs_are_recorded_as_input_data() -> None:
     assert [asset.url for asset in process.code.input_data] == urls
 
 
+def test_named_parameters_are_recorded_even_when_empty() -> None:
+    """A setting recorded as null says it was checked and absent, not forgotten."""
+    process = build_stage_process(
+        "s", resolve_code(url="https://x"), START, parameters={"displacement_field": None}
+    )
+    assert process.code.parameters.model_dump() == {"displacement_field": None}
+
+
 def test_write_round_trips_through_the_schema(tmp_path: Path) -> None:
     """The written file is what the terminal stage will read back."""
     process = build_stage_process("s", resolve_code(url="https://x"), START)
