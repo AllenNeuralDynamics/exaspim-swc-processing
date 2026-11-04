@@ -20,8 +20,8 @@ from exaspim_swc_processing.parent_metadata import MetadataSource, ParentMetadat
 RESOURCES = Path(__file__).parent / "resources"
 STEMS = ("N001-794492-HP", "N003-794492-JG")
 STAGE_FILES = {
-    "refinement/final-voxel": ".swc",
-    "refinement/final-voxel-resampled": ".swc",
+    "refinement/final-world": ".swc",
+    "refinement/final-world-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
 }
 CREATION_TIME = datetime(2026, 8, 19, 22, 10, 2, tzinfo=timezone.utc)
