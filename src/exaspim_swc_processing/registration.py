@@ -113,6 +113,9 @@ class RegistrationPass:
     sample_to_template : tuple[str, ...]
         Basenames of the sample-to-template transforms, resolved against
         ``<dataset>/ccf_alignment/``. The recorded paths point at Nextflow scratch.
+    applied_spacing_mm : tuple[float, float, float] | None
+        Spacing the registration set on the reoriented volume, in its axis order, or
+        ``None`` for records written before the registration recorded it.
     """
 
     input_uri: str
@@ -120,6 +123,20 @@ class RegistrationPass:
     resolution_um: int
     sample_scale_mm: tuple[float, float, float]
     sample_to_template: tuple[str, ...]
+    applied_spacing_mm: tuple[float, float, float] | None = None
+
+    @property
+    def point_scale(self) -> tuple[float, float, float] | None:
+        """Factors taking reoriented voxel indices to the pass's isotropic grid.
+
+        This is ``applied_spacing_mm`` over the pass resolution, or ``None`` when the
+        record predates ``applied_spacing_mm``.
+        """
+        if self.applied_spacing_mm is None:
+            return None
+        resolution_mm = self.resolution_um / 1000
+        x, y, z = (spacing / resolution_mm for spacing in self.applied_spacing_mm)
+        return (x, y, z)
 
     @property
     def loaded_spacing_mm(self) -> tuple[float, float, float]:
@@ -230,6 +247,11 @@ def parse_registration_record(
             sample_scale_mm=_as_float_triple(registration.get("sample_scale"), "sample_scale"),
             sample_to_template=tuple(
                 PurePosixPath(p).name for p in parameters.get("sample_to_template_transforms") or ()
+            ),
+            applied_spacing_mm=(
+                _as_float_triple(registration["applied_spacing_mm"], "applied_spacing_mm")
+                if registration.get("applied_spacing_mm") is not None
+                else None
             ),
         )
     available = sorted(
