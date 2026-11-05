@@ -343,3 +343,39 @@ def test_a_record_naming_two_template_assets_is_refused() -> None:
     paths[0] = "/data/reg_exaspim_template_to_ccf_25um_v1.5/1Warp.nii.gz"
     with pytest.raises(RegistrationRecordError, match="names 2"):
         recorded_template_to_ccf(record)
+
+
+def _with_applied_spacing(spacing: object) -> dict:
+    """Load the 826509 record with ``applied_spacing_mm`` added to its 10 um pass.
+
+    Returns
+    -------
+    dict
+        The modified record.
+    """
+    record = _record()
+    for process in record["data_processes"]:
+        parameters = process["code"]["parameters"]
+        if parameters.get("resolution_um") == 10:
+            parameters["sample_to_template_registration"]["applied_spacing_mm"] = spacing
+    return record
+
+
+def test_a_record_without_applied_spacing_has_no_point_scale() -> None:
+    """Records written before the registration recorded its spacing keep the old scale."""
+    result = parse_registration_record(_record())
+    assert result.applied_spacing_mm is None
+    assert result.point_scale is None
+
+
+def test_the_point_scale_is_the_applied_spacing_over_the_resolution() -> None:
+    """826509 was registered coarse axis second, so y is the 13.5 um axis."""
+    result = parse_registration_record(_with_applied_spacing([0.010125, 0.0135, 0.010125]))
+    assert result.applied_spacing_mm == (0.010125, 0.0135, 0.010125)
+    assert result.point_scale == pytest.approx((1.0125, 1.35, 1.0125))
+
+
+def test_a_malformed_applied_spacing_is_rejected() -> None:
+    """A wrong scale would move every node, so it must not be guessed."""
+    with pytest.raises(RegistrationRecordError, match="applied_spacing_mm"):
+        parse_registration_record(_with_applied_spacing([0.01, 0.01]))
