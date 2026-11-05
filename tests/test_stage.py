@@ -124,15 +124,15 @@ def test_carry_forward_republishes_upstream_stages(tmp_path: Path) -> None:
     data = tmp_path / "data"
     (data / "dispatch").mkdir(parents=True)
     (data / "dispatch" / "data_process.json").write_text("{}", encoding="utf-8")
-    (data / "refinement" / "final-voxel").mkdir(parents=True)
-    (data / "refinement" / "final-voxel" / "N001-794492-HP.swc").write_text("x", encoding="utf-8")
+    (data / "refinement" / "final-world").mkdir(parents=True)
+    (data / "refinement" / "final-world" / "N001-794492-HP.swc").write_text("x", encoding="utf-8")
 
     results = tmp_path / "results"
     carried = carry_forward(data, results, UPSTREAM_STAGES)
 
     assert carried == ["dispatch", "refinement"]
     assert (results / "dispatch" / "data_process.json").is_file()
-    assert (results / "refinement" / "final-voxel" / "N001-794492-HP.swc").is_file()
+    assert (results / "refinement" / "final-world" / "N001-794492-HP.swc").is_file()
 
 
 def test_carry_forward_skips_absent_stages(tmp_path: Path) -> None:

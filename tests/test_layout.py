@@ -20,8 +20,8 @@ from exaspim_swc_processing.naming import parse_stem
 STEMS = ("N001-794492-HP", "N003-794492-JG")
 
 STAGE_FILES = {
-    "refinement/final-voxel": ".swc",
-    "refinement/final-voxel-resampled": ".swc",
+    "refinement/final-world": ".swc",
+    "refinement/final-world-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
 }
 
@@ -79,7 +79,7 @@ def test_discover_cells_warns_and_skips_unparseable_names(
     stage_root: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A stray file that is not a reconstruction is skipped rather than aborting the scan."""
-    (stage_root / "refinement/final-voxel/notes.swc").write_text("x", encoding="utf-8")
+    (stage_root / "refinement/final-world/notes.swc").write_text("x", encoding="utf-8")
     with caplog.at_level(logging.WARNING):
         cells = discover_cells(stage_root)
     assert [identifier.stem for identifier in cells] == list(STEMS)
@@ -90,9 +90,9 @@ def test_discover_cells_warns_when_a_source_directory_is_absent(
     stage_root: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A role with no source directory is reported and the remaining roles still index."""
-    for path in (stage_root / "refinement/final-voxel-resampled").iterdir():
+    for path in (stage_root / "refinement/final-world-resampled").iterdir():
         path.unlink()
-    (stage_root / "refinement/final-voxel-resampled").rmdir()
+    (stage_root / "refinement/final-world-resampled").rmdir()
     with caplog.at_level(logging.WARNING):
         cells = discover_cells(stage_root)
     assert "specimen_resampled" in caplog.text
@@ -104,7 +104,7 @@ def test_missing_roles_reports_only_required_artifacts(stage_root: Path) -> None
     """An absent optional artifact does not make a cell incomplete; a required one does."""
     for path in (stage_root / "final/ccf_space_reconstructions/swcs").iterdir():
         path.unlink()
-    for path in (stage_root / "refinement/final-voxel-resampled").iterdir():
+    for path in (stage_root / "refinement/final-world-resampled").iterdir():
         path.unlink()
     cells = discover_cells(stage_root)
     for cell in cells.values():
@@ -114,7 +114,7 @@ def test_missing_roles_reports_only_required_artifacts(stage_root: Path) -> None
 def test_resolve_source_dir_prefers_the_first_existing_candidate(stage_root: Path) -> None:
     """Candidate source directories are tried in priority order."""
     spec = next(spec for spec in ARTIFACT_SPECS if spec.role == "specimen_refined")
-    assert resolve_source_dir(stage_root, spec) == stage_root / "refinement/final-voxel"
+    assert resolve_source_dir(stage_root, spec) == stage_root / "refinement/final-world"
 
 
 def test_resolve_source_dir_returns_none_when_no_candidate_exists(tmp_path: Path) -> None:
@@ -233,9 +233,9 @@ def test_specimen_resampled_is_optional_until_the_resample_stage_emits_it(
     stage_root: Path,
 ) -> None:
     """The resample stage does not yet produce it, so its absence is not fatal."""
-    for path in (stage_root / "refinement/final-voxel-resampled").iterdir():
+    for path in (stage_root / "refinement/final-world-resampled").iterdir():
         path.unlink()
-    (stage_root / "refinement/final-voxel-resampled").rmdir()
+    (stage_root / "refinement/final-world-resampled").rmdir()
     for cell in discover_cells(stage_root).values():
         assert "specimen_resampled" not in cell.artifacts
         assert cell.missing_roles() == ()
