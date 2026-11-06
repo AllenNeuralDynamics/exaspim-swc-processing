@@ -38,8 +38,8 @@ def test_code_version_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch
 def test_a_github_url_is_preferred_when_given(monkeypatch: pytest.MonkeyPatch) -> None:
     """AIND prefers a repository URL over a Code Ocean one."""
     monkeypatch.setenv("CO_CAPSULE_ID", CAPSULE_ID)
-    code = resolve_code(url="https://github.com/peter-grotz/exaspim-swc-processing")
-    assert code.url == "https://github.com/peter-grotz/exaspim-swc-processing"
+    code = resolve_code(url="https://github.com/AllenNeuralDynamics/exaspim-swc-processing")
+    assert code.url == "https://github.com/AllenNeuralDynamics/exaspim-swc-processing"
 
 
 def test_version_falls_back_to_the_installed_library(
