@@ -3,6 +3,6 @@ message: "If you use this software, please cite it as below."
 authors:
 - given-names: "Peter Grotz"
 title: "exaspim-swc-processing"
-version: "v0.0.0"
-date-released: 2026-09-21
+version: "v0.0.1"
+date-released: 2026-11-06
 url: "https://github.com/AllenNeuralDynamics/exaspim-swc-processing"
