@@ -1,31 +1,4 @@
 """Recover the CCF registration's own parameters and reconstruct its reference geometry.
-
-Transforming reconstructions into CCF space needs the geometry of the two volumes the
-registration worked from. Those are published under
-``<dataset>/ccf_alignment/registration_metadata/`` as NIfTI files of 1.4-1.8 GB each --
-but only sometimes: of 60 processed exaSPIM assets with a fused zarr, 40 have them. The
-rest cannot be transformed at all by code that insists on reading the files.
-
-Nothing in the transform needs the voxels. ``check_orientation`` mirrors coordinates about
-``input_img.shape``, and ``apply_transforms_to_points`` converts indices to physical
-coordinates using the resampled image's spacing, origin and direction. Both are geometry.
-The only consumer of pixel data is the QC overlay rendering, which this pipeline does not
-produce.
-
-So the geometry is rebuilt from metadata the registration already publishes:
-``<dataset>/ccf_alignment/processing.json`` records the zarr it read, the pyramid level,
-and the ``sample_scale`` it assigned. Shapes come from that zarr's ``.zarray``.
-
-Three details are load-bearing, each verified against all 40 samples that publish the real
-volumes. Getting any of them wrong yields plausible coordinates rather than an error:
-
-* The source is ``fused_ccf_ch.zarr``, not ``fused.zarr``. Rules derived from the signal
-  pyramid match only 11-27 of 40; the CCF channel matches 40/40.
-* The resampled shape must be computed with exact rationals. ``0.0135 / 0.01`` evaluates
-  to ``1.3499999999999999`` in binary floating point, so a shape of 1270 rounds down to
-  1714 where the registration produced 1715.
-* The direction matrix is expressed in ANTs/ITK LPS, which negates the first two rows of
-  the NIfTI RAS ``srow``.
 """
 
 from __future__ import annotations
