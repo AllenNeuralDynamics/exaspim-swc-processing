@@ -31,7 +31,7 @@ PIPELINE = Code(
     version="0.1.0",
 )
 PACKAGER = Code(
-    url="https://github.com/peter-grotz/exaspim-swc-processing",
+    url="https://github.com/AllenNeuralDynamics/exaspim-swc-processing",
     name="exaspim-swc-processing",
     version="0.1.0",
 )
