@@ -5,7 +5,7 @@
 ![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-![Python](https://img.shields.io/badge/python->=3.11,<=3.13-blue?logo=python)
+![Python](https://img.shields.io/badge/python->=3.11,<3.14-blue?logo=python)
 ![support](https://img.shields.io/badge/support-supported-brightgreen) 
 
 
