@@ -5,11 +5,8 @@ them into each cell's :class:`~aind_data_schema.core.processing.Processing`. Thi
 the ``processing_metadata.py`` that was duplicated byte-for-byte across two capsules, whose
 surrounding helpers had already drifted apart.
 
-It also fixes how provenance was recorded. The old helper hardcoded a capsule slug — the
-wrong one, as it happens: the transform capsule recorded slug ``7989393`` while running as
-``4319239`` — and filled ``Code.version`` from ``git ls-remote HEAD`` at run time rather
-than the commit the pipeline pinned. Both are read from the environment here, so a stage
-reports the code that actually ran.
+Provenance is read from the environment rather than hardcoded, so a stage reports the
+code that actually ran.
 
 A record carries only what the schema requires, plus the inputs the stage applied
 (``Code.input_data``) and any named settings it is asked to record (``Code.parameters``).

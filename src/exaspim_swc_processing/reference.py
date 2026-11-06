@@ -1,30 +1,5 @@
 """Build stand-ins for the registration's reference volumes from their geometry alone.
 
-The transform reads two NIfTI volumes of 1.4-1.8 GB each from
-``<dataset>/ccf_alignment/registration_metadata/``. Only 40 of 60 processed exaSPIM
-assets publish them, so a transform that insists on reading the files cannot run on the
-rest -- and on the 40 that can, it spends several gigabytes of memory on data it never
-reads a voxel of.
-
-Three consumers touch those volumes, and between them they need twelve numbers:
-
-* ``check_orientation`` mirrors coordinates about ``input_img.shape`` -- three integers.
-* ``CoordinateConverter.index_to_physical`` evaluates
-  ``origin + (index * spacing) @ direction.T``. There is no shape term, so a 1x1x1 image
-  carrying the right spacing, origin and direction gives bit-identical results.
-* ``ImageVisualizer.perc_normalization`` reads voxels, but its output is consumed only by
-  the QC overlay renderer, which this pipeline disables.
-
-:func:`reference_arrays` supplies the shapes without allocating: ``numpy.broadcast_to``
-returns a zero-strided view, so a ``(2061, 646, 1267)`` array that would occupy 1.69 GB
-costs about 50 KB. :func:`apply_geometry` stamps a geometry onto a minimal image.
-
-The arrays are read-only and constant. Nothing downstream writes to them, but
-``perc_normalization`` would raise on constant data -- it asserts that its two percentiles
-differ -- so the caller must disable it before transforming. That is the caller's job
-because the symbol lives in ``aind_exaspim_register_cells``, which this library does not
-depend on.
-
 See :mod:`exaspim_swc_processing.registration` for where the geometry comes from and how
 it was verified.
 """
