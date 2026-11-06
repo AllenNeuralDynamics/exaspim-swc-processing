@@ -91,8 +91,8 @@ def derive_cell_data_description(
 
     Examples
     --------
-    >>> derive_cell_data_description(parent, parse_stem("N001-794492-HP"), when).name
-    'exaSPIM_794492_2026-01-09_16-50-40_reconstruction-N001_2026-08-19_22-10-02'
+    >>> derive_cell_data_description(parent, parse_stem("N001-123456-HP"), when).name
+    'exaSPIM_123456_2026-01-01_00-00-00_reconstruction-N001_2026-02-01_00-00-00'
     """
     try:
         return derive_data_description_from_derived(

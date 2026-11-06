@@ -10,7 +10,7 @@ Specimen-space reconstructions are published in physical coordinates (microns) a
 densities: ``refined`` is the full-resolution tracing and ``resampled`` is the sparser form
 produced alongside the CCF resampling. The upstream ``final-voxel`` outputs are not carried.
 
-``specimen_resampled`` is optional until the resample stage produces it; see issue #5.
+``specimen_resampled`` is optional.
 
 Stage outputs are never modified; artifacts are hardlinked where the filesystem allows it and
 copied otherwise, so a run costs little beyond the directory entries.
