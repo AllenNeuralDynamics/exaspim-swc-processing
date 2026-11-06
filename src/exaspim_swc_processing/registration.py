@@ -29,9 +29,7 @@ WRITTEN_SPACING_MM = {
 }
 """Spacing the registration writes into a loaded volume's header, by ``resolution_um``.
 
-Fixed per pass in the registration's configuration, not read from the sample. The 10 um
-entry matches all 48 published volumes; the 25 um entry is its configured counterpart and
-is not exercised by the SWC transform.
+Fixed per pass in the registration's configuration, not read from the sample. 
 """
 
 ANTS_DIRECTION = (
