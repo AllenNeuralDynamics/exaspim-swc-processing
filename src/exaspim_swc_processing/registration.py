@@ -115,15 +115,12 @@ class RegistrationPass:
 
         This is a constant of the pass, not a per-sample quantity: the registration
         configures a fixed ``sample_scale`` per resolution and writes it after applying
-        the acquisition's axis swaps. All 48 published volumes carry
-        ``(0.010125, 0.010125, 0.0135)``.
+        the acquisition's axis swaps: ``(0.010125, 0.010125, 0.0135)``.
 
         It is deliberately not derived from the recorded ``sample_scale``, which is
         ambiguous. Some records store the raw configuration (coarse axis first) and
-        others the reordered result, with nothing to distinguish them: 730904 and 826509
-        have identical acquisition axes and therefore identical swaps, yet record
-        ``(0.010125, 0.010125, 0.0135)`` and ``(0.0135, 0.010125, 0.010125)``
-        respectively. Any rule reading that field is wrong for one of them.
+        others the reordered result, with nothing to distinguish them, so datasets with
+        identical acquisition axes can record different orders.
 
         Note the written spacing does not correspond to the array's physical axes: the
         volume is stored ``(x, z, y)``, so the coarse value lands on axis 2 while the
@@ -260,8 +257,8 @@ def resampled_geometry(loaded: VolumeGeometry) -> VolumeGeometry:
     """Geometry of the isotropically resampled volume.
 
     Shapes are computed with exact rationals and rounded half up. Binary floating point
-    puts ``0.0135 / 0.01`` just below 1.35, which rounds a 1270-voxel axis down to 1714
-    where the registration produced 1715.
+    puts ``0.0135 / 0.01`` just below 1.35, which can round an axis one voxel short of
+    what the registration produced.
 
     Parameters
     ----------
@@ -478,9 +475,7 @@ def recorded_template_to_ccf(record: dict) -> str:
     the v1 schema mention them only in a process's ``notes``. Both are read, and every
     mention must name the same asset.
 
-    The answer is only as good as the record. Registrations run between 2025-10-06 and
-    the correction of their records mounted v1.5 at the ``..._v1.4`` path, so their
-    records say v1.4.
+    The answer is only as good as the record.
 
     Parameters
     ----------

@@ -1,7 +1,7 @@
 """Identifiers and asset names for exaSPIM SWC reconstructions.
 
 Reconstruction files produced upstream are named ``<neuron-id>-<subject-id>-<annotator>.swc``,
-for example ``N001-794492-HP.swc``. Every stage of the pipeline keys off that stem, so this
+for example ``N001-123456-HP.swc``. Every stage of the pipeline keys off that stem, so this
 module turns it into a validated value object and derives the AIND asset names built from it.
 
 AIND asset names use ``_`` to separate tokens, so no individual token may contain one. See
@@ -42,7 +42,7 @@ class ReconstructionId:
     neuron_id : str
         Neuron identifier local to the subject, e.g. ``"N001"``.
     subject_id : str
-        Numeric subject identifier, e.g. ``"794492"``. Kept as a string because it is an
+        Numeric subject identifier, e.g. ``"123456"``. Kept as a string because it is an
         identifier rather than a quantity, and leading zeros are meaningful.
     annotator : str
         Initials of the annotator who traced the reconstruction, e.g. ``"HP"``.
@@ -59,7 +59,7 @@ class ReconstructionId:
         Returns
         -------
         str
-            The stem, e.g. ``"N001-794492-HP"``.
+            The stem, e.g. ``"N001-123456-HP"``.
         """
         return STEM_SEPARATOR.join((self.neuron_id, self.subject_id, self.annotator))
 
@@ -110,7 +110,7 @@ def parse_stem(stem: str) -> ReconstructionId:
     Parameters
     ----------
     stem : str
-        Stem of a reconstruction file, without extension, e.g. ``"N001-794492-HP"``.
+        Stem of a reconstruction file, without extension, e.g. ``"N001-123456-HP"``.
 
     Returns
     -------
@@ -125,8 +125,8 @@ def parse_stem(stem: str) -> ReconstructionId:
 
     Examples
     --------
-    >>> parse_stem("N001-794492-HP")
-    ReconstructionId(neuron_id='N001', subject_id='794492', annotator='HP')
+    >>> parse_stem("N001-123456-HP")
+    ReconstructionId(neuron_id='N001', subject_id='123456', annotator='HP')
     """
     tokens = stem.split(STEM_SEPARATOR)
     if len(tokens) != STEM_TOKEN_COUNT:
@@ -161,7 +161,7 @@ def derived_asset_name(
     ----------
     primary_asset_name : str
         Name of the primary (raw) asset this reconstruction derives from, e.g.
-        ``"exaSPIM_794492_2026-01-09_16-50-40"``.
+        ``"exaSPIM_123456_2026-01-01_00-00-00"``.
     reconstruction : ReconstructionId
         Identifier of the reconstruction the asset describes.
     creation_time : datetime
@@ -172,7 +172,7 @@ def derived_asset_name(
     -------
     str
         The derived asset name, e.g.
-        ``"exaSPIM_794492_2026-01-09_16-50-40_reconstruction-N001_2026-08-19_22-10-02"``.
+        ``"exaSPIM_123456_2026-01-01_00-00-00_reconstruction-N001_2026-02-01_00-00-00"``.
 
     Raises
     ------

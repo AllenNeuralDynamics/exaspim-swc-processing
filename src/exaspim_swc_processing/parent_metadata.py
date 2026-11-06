@@ -6,9 +6,7 @@ tried in order, because exaSPIM coverage is uneven:
 
 1. **DocDB v2** — already migrated centrally. Preferred: nothing local to do.
 2. **DocDB v1** — the original document, upgraded locally with ``aind-metadata-upgrader``.
-3. **S3** — the bucket the indexer itself reads, for assets not yet registered. As of
-   2026-09, no exaSPIM 2026 acquisition appears in the v2 index and recent subjects are
-   absent from both, so this path is load-bearing rather than theoretical.
+3. **S3** — the bucket the indexer itself reads, for assets not yet registered.
 
 Which source answered is recorded in the output, so assets built from a fallback can be
 found and re-derived once the upstream registration catches up. See
