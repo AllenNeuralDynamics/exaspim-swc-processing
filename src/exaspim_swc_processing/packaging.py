@@ -4,13 +4,17 @@ Ties the other modules together: :mod:`layout` regroups the stage outputs by cel
 :mod:`naming` and :mod:`data_description` name and describe each one, and :mod:`processing`
 records how it was made. This module drives them and writes the result to disk.
 
-Each cell directory receives exactly two metadata files, ``data_description.json`` and
+Each cell directory receives two metadata files, ``data_description.json`` and
 ``processing.json``. That is the complete required set for a ``processing``-type derived
 asset: ``REQUIRED_FILE_SETS`` in aind-data-schema only demands ``data_description``
 alongside ``processing``. ``subject``, ``procedures``, ``acquisition`` and ``instrument``
 are deliberately not inherited — including ``subject`` would pull in a four-file
 requirement that the upstream assets cannot currently satisfy, so the asset would advertise
-itself as incomplete. Quality control belongs to a later stage and is not written here.
+itself as incomplete.
+
+A cell's ``quality_control.json`` is written as well when a record was found for it; see
+:mod:`~exaspim_swc_processing.quality_control`. It is optional — no file set requires it —
+so a cell without one is still packaged, and a warning is logged.
 
 Packaging does not record itself as a
 :class:`~aind_data_schema.core.processing.DataProcess`. It changes no data -- the
@@ -30,6 +34,7 @@ from pathlib import Path
 
 from aind_data_schema.components.identifiers import Code
 from aind_data_schema.core.processing import DataProcess
+from aind_data_schema.core.quality_control import QualityControl
 
 from exaspim_swc_processing.data_description import (
     DataDescriptionDerivationError,
@@ -40,6 +45,7 @@ from exaspim_swc_processing.layout import write_cell_directory as _write_cell_di
 from exaspim_swc_processing.naming import ReconstructionId
 from exaspim_swc_processing.parent_metadata import ParentMetadata
 from exaspim_swc_processing.processing import build_cell_processing
+from exaspim_swc_processing.quality_control import QUALITY_CONTROL_FILENAME
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +65,14 @@ class PackagedCell:
         Directory written.
     asset_name : str
         Name of the derived asset, which is also the directory name.
+    has_quality_control : bool
+        Whether a ``quality_control.json`` was written for the cell.
     """
 
     reconstruction: ReconstructionId
     directory: Path
     asset_name: str
+    has_quality_control: bool = False
 
 
 @dataclass(frozen=True)
@@ -108,6 +117,7 @@ def package_cells(
     creation_time: datetime,
     specs: Sequence[ArtifactSpec] = ARTIFACT_SPECS,
     overrides: Mapping[str, object] | None = None,
+    quality_control: Mapping[ReconstructionId, QualityControl] | None = None,
 ) -> PackagingResult:
     """Write every discovered cell as its own derived data asset.
 
@@ -129,6 +139,10 @@ def package_cells(
         Artifacts to collect, by default :data:`~exaspim_swc_processing.layout.ARTIFACT_SPECS`.
     overrides : Mapping[str, object] | None, optional
         ``DataDescription`` fields to set explicitly on every cell, overriding the parent.
+    quality_control : Mapping[ReconstructionId, QualityControl] | None, optional
+        Quality control record of each cell, typically from
+        :func:`~exaspim_swc_processing.quality_control.discover_quality_control`. Cells
+        without one are packaged without ``quality_control.json``.
 
     Returns
     -------
@@ -141,7 +155,12 @@ def package_cells(
     packaged: list[PackagedCell] = []
     skipped: list[SkippedCell] = []
 
-    for reconstruction, cell in discover_cells(stage_root, specs).items():
+    quality_control = quality_control or {}
+    cells = discover_cells(stage_root, specs)
+    for unmatched in sorted(r.stem for r in quality_control if r not in cells):
+        logger.warning("Quality control for %s matches no reconstruction", unmatched)
+
+    for reconstruction, cell in cells.items():
         missing = cell.missing_roles(specs)
         if missing:
             logger.warning(
@@ -170,7 +189,14 @@ def package_cells(
         (cell_dir / PROCESSING_FILENAME).write_text(
             record.model_dump_json(indent=2), encoding="utf-8"
         )
-        packaged.append(PackagedCell(reconstruction, cell_dir, description.name))
+        qc = quality_control.get(reconstruction)
+        if qc is None:
+            logger.warning("No quality control for %s", reconstruction.stem)
+        else:
+            (cell_dir / QUALITY_CONTROL_FILENAME).write_text(
+                qc.model_dump_json(indent=2), encoding="utf-8"
+            )
+        packaged.append(PackagedCell(reconstruction, cell_dir, description.name, qc is not None))
 
     logger.info("Packaged %d cell(s), skipped %d", len(packaged), len(skipped))
     return PackagingResult(packaged=tuple(packaged), skipped=tuple(skipped))

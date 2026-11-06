@@ -1,6 +1,7 @@
 """Tests for :mod:`exaspim_swc_processing.packaging`."""
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,13 +10,16 @@ from aind_data_schema.components.identifiers import Code
 from aind_data_schema.core.data_description import DataDescription
 from aind_data_schema.core.metadata import Metadata
 from aind_data_schema.core.processing import DataProcess, Processing
+from aind_data_schema.core.quality_control import QualityControl
 
+from exaspim_swc_processing.naming import parse_stem
 from exaspim_swc_processing.packaging import (
     DATA_DESCRIPTION_FILENAME,
     PROCESSING_FILENAME,
     package_cells,
 )
 from exaspim_swc_processing.parent_metadata import MetadataSource, ParentMetadata
+from exaspim_swc_processing.quality_control import QUALITY_CONTROL_FILENAME
 
 RESOURCES = Path(__file__).parent / "resources"
 STEMS = ("N001-794492-HP", "N003-794492-JG")
@@ -139,7 +143,7 @@ def test_each_cell_gets_its_own_directory(stage_root: Path, tmp_path: Path) -> N
 
 
 def test_exactly_two_metadata_files_are_written(stage_root: Path, tmp_path: Path) -> None:
-    """Only data_description and processing; no subject, procedures or QC."""
+    """Without QC, only data_description and processing; no subject or procedures."""
     result = _package(stage_root, tmp_path)
     directory = result.packaged[0].directory
     written = {path.name for path in directory.iterdir() if path.is_file()}
@@ -240,3 +244,74 @@ def test_the_metadata_source_stays_discoverable_on_tags(stage_root: Path, tmp_pa
         (result.packaged[0].directory / DATA_DESCRIPTION_FILENAME).read_text(encoding="utf-8")
     )
     assert any(tag.startswith("metadata-source:") for tag in description["tags"])
+
+
+def _quality_control() -> QualityControl:
+    """Load the quality control fixture, which covers ``STEMS[0]``.
+
+    Returns
+    -------
+    QualityControl
+        The record.
+    """
+    return QualityControl.model_validate_json(
+        (RESOURCES / "quality_control.json").read_text(encoding="utf-8")
+    )
+
+
+def test_quality_control_is_written_for_the_cells_that_have_it(
+    stage_root: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A cell with a record carries it; one without is still packaged, with a warning."""
+    record = _quality_control()
+    with caplog.at_level(logging.WARNING):
+        result = _package(stage_root, tmp_path, quality_control={parse_stem(STEMS[0]): record})
+    with_qc, without_qc = result.packaged
+    assert with_qc.has_quality_control
+    assert not without_qc.has_quality_control
+    assert not (without_qc.directory / QUALITY_CONTROL_FILENAME).exists()
+    assert f"No quality control for {STEMS[1]}" in caplog.text
+
+    written = QualityControl.model_validate_json(
+        (with_qc.directory / QUALITY_CONTROL_FILENAME).read_text(encoding="utf-8")
+    )
+    assert written == record
+
+
+def test_packaged_quality_control_validates_with_the_asset(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """The three files together form a valid derived asset record."""
+    result = _package(
+        stage_root, tmp_path, quality_control={parse_stem(STEMS[0]): _quality_control()}
+    )
+    directory = result.packaged[0].directory
+    description = DataDescription.model_validate_json(
+        (directory / DATA_DESCRIPTION_FILENAME).read_text(encoding="utf-8")
+    )
+    record = Metadata(
+        name=description.name,
+        location=f"s3://aind-open-data/{description.name}",
+        data_description=description,
+        processing=Processing.model_validate_json(
+            (directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
+        ),
+        quality_control=QualityControl.model_validate_json(
+            (directory / QUALITY_CONTROL_FILENAME).read_text(encoding="utf-8")
+        ),
+    )
+    assert record.quality_control is not None
+
+
+def test_quality_control_for_an_unknown_cell_is_reported(
+    stage_root: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A stem mismatch between QC and the reconstructions is surfaced, not hidden."""
+    with caplog.at_level(logging.WARNING):
+        result = _package(
+            stage_root,
+            tmp_path,
+            quality_control={parse_stem("N999-794492-HP"): _quality_control()},
+        )
+    assert not any(cell.has_quality_control for cell in result.packaged)
+    assert "Quality control for N999-794492-HP matches no reconstruction" in caplog.text
