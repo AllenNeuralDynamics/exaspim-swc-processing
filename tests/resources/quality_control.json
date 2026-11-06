@@ -1,0 +1,181 @@
+{
+  "object_type": "Quality control",
+  "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/quality_control.py",
+  "schema_version": "2.4.2",
+  "metrics": [
+    {
+      "object_type": "QC metric",
+      "name": "required_columns_raw",
+      "modality": {
+        "name": "Selective plane illumination microscopy",
+        "abbreviation": "SPIM"
+      },
+      "stage": "Processing",
+      "value": 0.0,
+      "status_history": [
+        {
+          "object_type": "QC status",
+          "evaluator": "Automated: standard_morph",
+          "status": "Pass",
+          "timestamp": "2026-11-04T18:32:47.047731Z"
+        }
+      ],
+      "description": "All required SWC columns are present. | Measurements: required_columns=[node_id, compartment, x, y, z, r, parent], present_columns=[node_id, compartment, x, y, z, r, parent], missing_columns=[]",
+      "reference": null,
+      "tags": {
+        "swc_stage": "raw",
+        "phase": "integrity",
+        "swc": "N001-794492-HP"
+      },
+      "evaluated_assets": null
+    },
+    {
+      "object_type": "QC metric",
+      "name": "single_root_node_raw",
+      "modality": {
+        "name": "Selective plane illumination microscopy",
+        "abbreviation": "SPIM"
+      },
+      "stage": "Processing",
+      "value": 1.0,
+      "status_history": [
+        {
+          "object_type": "QC status",
+          "evaluator": "Automated: standard_morph",
+          "status": "Pass",
+          "timestamp": "2026-11-04T18:32:47.047731Z"
+        }
+      ],
+      "description": "Single valid root: one soma-type root, node_id 1. | Measurements: n_soma_roots=1, n_type1_nodes=1",
+      "reference": null,
+      "tags": {
+        "swc_stage": "raw",
+        "phase": "morphology",
+        "swc": "N001-794492-HP"
+      },
+      "evaluated_assets": null
+    },
+    {
+      "object_type": "QC metric",
+      "name": "required_columns_refined",
+      "modality": {
+        "name": "Selective plane illumination microscopy",
+        "abbreviation": "SPIM"
+      },
+      "stage": "Processing",
+      "value": 0.0,
+      "status_history": [
+        {
+          "object_type": "QC status",
+          "evaluator": "Automated: standard_morph",
+          "status": "Pass",
+          "timestamp": "2026-11-04T18:42:12.590872Z"
+        }
+      ],
+      "description": "All required SWC columns are present. | Measurements: required_columns=[node_id, compartment, x, y, z, r, parent], present_columns=[node_id, compartment, x, y, z, r, parent], missing_columns=[]",
+      "reference": null,
+      "tags": {
+        "swc_stage": "refined",
+        "phase": "integrity",
+        "swc": "N001-794492-HP"
+      },
+      "evaluated_assets": null
+    },
+    {
+      "object_type": "QC metric",
+      "name": "single_root_node_refined",
+      "modality": {
+        "name": "Selective plane illumination microscopy",
+        "abbreviation": "SPIM"
+      },
+      "stage": "Processing",
+      "value": 1.0,
+      "status_history": [
+        {
+          "object_type": "QC status",
+          "evaluator": "Automated: standard_morph",
+          "status": "Pass",
+          "timestamp": "2026-11-04T18:42:12.590872Z"
+        }
+      ],
+      "description": "Single valid root: one soma-type root, node_id 1. | Measurements: n_soma_roots=1, n_type1_nodes=1",
+      "reference": null,
+      "tags": {
+        "swc_stage": "refined",
+        "phase": "morphology",
+        "swc": "N001-794492-HP"
+      },
+      "evaluated_assets": null
+    },
+    {
+      "object_type": "QC metric",
+      "name": "required_columns_transformed",
+      "modality": {
+        "name": "Selective plane illumination microscopy",
+        "abbreviation": "SPIM"
+      },
+      "stage": "Processing",
+      "value": 0.0,
+      "status_history": [
+        {
+          "object_type": "QC status",
+          "evaluator": "Automated: standard_morph",
+          "status": "Pass",
+          "timestamp": "2026-11-04T20:26:32.827356Z"
+        }
+      ],
+      "description": "All required SWC columns are present. | Measurements: required_columns=[node_id, compartment, x, y, z, r, parent], present_columns=[node_id, compartment, x, y, z, r, parent], missing_columns=[]",
+      "reference": null,
+      "tags": {
+        "swc_stage": "transformed",
+        "phase": "integrity",
+        "swc": "N001-794492-HP"
+      },
+      "evaluated_assets": null
+    },
+    {
+      "object_type": "QC metric",
+      "name": "single_root_node_transformed",
+      "modality": {
+        "name": "Selective plane illumination microscopy",
+        "abbreviation": "SPIM"
+      },
+      "stage": "Processing",
+      "value": 1.0,
+      "status_history": [
+        {
+          "object_type": "QC status",
+          "evaluator": "Automated: standard_morph",
+          "status": "Pass",
+          "timestamp": "2026-11-04T20:26:32.827356Z"
+        }
+      ],
+      "description": "Single valid root: one soma-type root, node_id 1. | Measurements: n_soma_roots=1, n_type1_nodes=1",
+      "reference": null,
+      "tags": {
+        "swc_stage": "transformed",
+        "phase": "morphology",
+        "swc": "N001-794492-HP"
+      },
+      "evaluated_assets": null
+    }
+  ],
+  "key_experimenters": null,
+  "notes": "standard_morph 1.0.3 structural QC under policy 'merged_prepipeline_v1'",
+  "default_grouping": [
+    "swc_stage",
+    "swc",
+    "phase"
+  ],
+  "allow_tag_failures": [],
+  "status": {
+    "swc_stage:refined": "Pass",
+    "phase:morphology": "Pass",
+    "swc_stage:raw": "Pass",
+    "swc:N001-794492-HP": "Pass",
+    "phase:integrity": "Pass",
+    "swc_stage:transformed": "Pass",
+    "SPIM": "Pass",
+    "Processing": "Pass"
+  }
+}
