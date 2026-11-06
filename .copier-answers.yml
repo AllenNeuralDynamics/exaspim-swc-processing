@@ -11,7 +11,7 @@ project_created_date: '2026-09-21'
 project_description: Processing and packaging of exaSPIM neuron SWC reconstructions
     into per-cell AIND derived data assets.
 project_name: exaspim-swc-processing
-project_url: https://github.com/peter-grotz/exaspim-swc-processing
+project_url: https://github.com/AllenNeuralDynamics/exaspim-swc-processing
 release_type: GitHub
 repo_visibility: private
 template_type: library-template
