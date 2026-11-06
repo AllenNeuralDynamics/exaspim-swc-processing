@@ -1,5 +1,4 @@
-"""Recover the CCF registration's own parameters and reconstruct its reference geometry.
-"""
+"""Recover the CCF registration's own parameters and reconstruct its reference geometry."""
 
 from __future__ import annotations
 
@@ -29,7 +28,7 @@ WRITTEN_SPACING_MM = {
 }
 """Spacing the registration writes into a loaded volume's header, by ``resolution_um``.
 
-Fixed per pass in the registration's configuration, not read from the sample. 
+Fixed per pass in the registration's configuration, not read from the sample.
 """
 
 ANTS_DIRECTION = (
