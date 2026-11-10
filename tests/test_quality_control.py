@@ -3,6 +3,7 @@
 import json
 import logging
 from pathlib import Path
+from urllib.parse import quote, urlencode
 
 import pytest
 from aind_data_schema.core.quality_control import QualityControl
@@ -11,6 +12,8 @@ from exaspim_swc_processing.naming import parse_stem
 from exaspim_swc_processing.quality_control import (
     cell_from_path,
     discover_quality_control,
+    resolve_reference,
+    resolve_skeleton_references,
     split_by_cell,
 )
 
@@ -193,3 +196,189 @@ def test_a_directory_matching_the_pattern_is_ignored(tmp_path: Path) -> None:
 def test_no_records_yields_nothing(tmp_path: Path) -> None:
     """Quality control is optional."""
     assert discover_quality_control(tmp_path) == {}
+
+
+CCF_SOURCE = "ccf_space_reconstructions/reconstructions.precomputed"
+SPECIMEN_SOURCE = "specimen_space_reconstructions/reconstructions.precomputed"
+ASSET_URI = "s3://aind-open-data/exaSPIM_794492_x_reconstruction-N001_y"
+IMAGE = "zarr://s3://aind-open-data/exaSPIM_794492 x/fused.zarr"
+
+
+def _reference(*params: tuple[str, str]) -> str:
+    """Encode a reference the way ``standard_morph`` does.
+
+    Parameters
+    ----------
+    *params : tuple[str, str]
+        Query parameters, in order.
+
+    Returns
+    -------
+    str
+        The ``js:neuroglancer?`` reference.
+    """
+    return "js:neuroglancer?" + urlencode(params, quote_via=quote, safe=":/,")
+
+
+def test_a_relative_skeleton_is_made_absolute() -> None:
+    """Only the skeleton changes; the image and goto actions survive byte for byte."""
+    reference = _reference(
+        ("image", IMAGE),
+        ("skeleton", CCF_SOURCE),
+        ("segments", "7"),
+        ("action", "goto:1.5,2,3"),
+        ("action", "goto:4,5,6"),
+    )
+    assert resolve_reference(reference, ASSET_URI, {CCF_SOURCE}) == _reference(
+        ("image", IMAGE),
+        ("skeleton", f"{ASSET_URI}/{CCF_SOURCE}"),
+        ("segments", "1"),
+        ("action", "goto:1.5,2,3"),
+        ("action", "goto:4,5,6"),
+    )
+
+
+def test_segments_are_added_when_quality_control_gave_none() -> None:
+    """The source holds one segment, which the link should show."""
+    reference = _reference(("skeleton", CCF_SOURCE))
+    assert resolve_reference(reference, ASSET_URI, {CCF_SOURCE}) == _reference(
+        ("skeleton", f"{ASSET_URI}/{CCF_SOURCE}"), ("segments", "1")
+    )
+
+
+def test_a_dry_run_leaves_the_reference_relative() -> None:
+    """Without a destination there is no URI to resolve against."""
+    reference = _reference(("skeleton", CCF_SOURCE), ("segments", "1"))
+    assert resolve_reference(reference, None, {CCF_SOURCE}) == reference
+
+
+@pytest.mark.parametrize("asset_uri", [ASSET_URI, None])
+def test_a_skeleton_the_asset_lacks_is_removed(asset_uri: str | None) -> None:
+    """A link to a source that was not written is dropped, keeping the rest.
+
+    Parameters
+    ----------
+    asset_uri : str | None
+        Asset URI, or a dry run; neither may publish a dangling link.
+    """
+    reference = _reference(
+        ("image", IMAGE), ("skeleton", CCF_SOURCE), ("segments", "1"), ("action", "goto:1,2,3")
+    )
+    assert resolve_reference(reference, asset_uri, set()) == _reference(
+        ("image", IMAGE), ("action", "goto:1,2,3")
+    )
+
+
+def test_a_reference_left_empty_becomes_none() -> None:
+    """A reference that held only the missing skeleton has nothing left to open."""
+    reference = _reference(("skeleton", CCF_SOURCE), ("segments", "1"))
+    assert resolve_reference(reference, ASSET_URI, set()) is None
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        None,
+        "https://example.org/plot.png",
+        _reference(("skeleton", "s3://bucket/qc/run/skeletons"), ("segments", "3")),
+        _reference(("image", IMAGE), ("action", "goto:1,2,3")),
+    ],
+)
+def test_other_references_are_left_alone(reference: str | None) -> None:
+    """Absolute sources, other kinds of reference and no reference are not touched.
+
+    Parameters
+    ----------
+    reference : str | None
+        A reference with nothing to resolve.
+    """
+    assert resolve_reference(reference, ASSET_URI, {CCF_SOURCE}) == reference
+
+
+def _with_references(*references: str | None) -> QualityControl:
+    """Build a record from the fixture with the given references on its first metrics.
+
+    Parameters
+    ----------
+    *references : str | None
+        References to set, one per metric from the first.
+
+    Returns
+    -------
+    QualityControl
+        The record.
+    """
+    payload = _payload()
+    for metric, reference in zip(payload["metrics"], references):
+        metric["reference"] = reference
+    return QualityControl.model_validate(payload)
+
+
+def _cell_dir(tmp_path: Path, *sources: str) -> Path:
+    """Create a cell directory holding the given precomputed sources.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Pytest-provided temporary directory.
+    *sources : str
+        Asset-relative source directories to create.
+
+    Returns
+    -------
+    Path
+        The cell directory.
+    """
+    cell_dir = tmp_path / "exaSPIM_794492_x_reconstruction-N001_y"
+    cell_dir.mkdir()
+    for source in sources:
+        (cell_dir / source).mkdir(parents=True)
+    return cell_dir
+
+
+def test_a_record_is_resolved_against_its_cell(tmp_path: Path) -> None:
+    """Each space's references point at that space's source; status is unchanged."""
+    record = _with_references(
+        _reference(("skeleton", CCF_SOURCE), ("segments", "1")),
+        _reference(("skeleton", SPECIMEN_SOURCE), ("segments", "1")),
+    )
+    cell_dir = _cell_dir(tmp_path, CCF_SOURCE, SPECIMEN_SOURCE)
+    resolved = resolve_skeleton_references(record, ASSET_URI, cell_dir)
+
+    first, second = resolved.metrics[:2]
+    assert f"skeleton={ASSET_URI}/{CCF_SOURCE}&segments=1" in first.reference
+    assert f"skeleton={ASSET_URI}/{SPECIMEN_SOURCE}&segments=1" in second.reference
+    assert resolved.metrics[2:] == record.metrics[2:]
+    assert resolved.status == record.status
+    assert QualityControl.model_validate_json(resolved.model_dump_json()) == resolved
+
+
+def test_a_record_with_nothing_to_resolve_is_returned_as_is(tmp_path: Path) -> None:
+    """No copy is made when no reference changes."""
+    record = _with_references(_reference(("skeleton", CCF_SOURCE)))
+    cell_dir = _cell_dir(tmp_path, CCF_SOURCE)
+    assert resolve_skeleton_references(record, None, cell_dir) is record
+    plain = QualityControl.model_validate(_payload())
+    assert resolve_skeleton_references(plain, ASSET_URI, cell_dir) is plain
+
+
+def test_a_missing_source_is_reported_once(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Every metric of a stage shares its source, so one warning covers them all."""
+    reference = _reference(("skeleton", SPECIMEN_SOURCE), ("action", "goto:1,2,3"))
+    record = _with_references(reference, reference, reference)
+    cell_dir = _cell_dir(tmp_path, CCF_SOURCE)
+    with caplog.at_level(logging.WARNING):
+        resolved = resolve_skeleton_references(record, ASSET_URI, cell_dir)
+    assert caplog.text.count(f"has no {SPECIMEN_SOURCE}") == 1
+    expected = _reference(("action", "goto:1,2,3"))
+    assert all(metric.reference == expected for metric in resolved.metrics[:3])
+
+
+def test_a_dry_run_is_logged(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """A dry run says why its references are still relative."""
+    record = _with_references(_reference(("skeleton", CCF_SOURCE)))
+    with caplog.at_level(logging.INFO):
+        resolve_skeleton_references(record, None, _cell_dir(tmp_path, CCF_SOURCE))
+    assert "Dry run: quality control references" in caplog.text

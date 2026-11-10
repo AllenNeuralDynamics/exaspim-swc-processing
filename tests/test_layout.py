@@ -18,11 +18,14 @@ from exaspim_swc_processing.layout import (
 from exaspim_swc_processing.naming import parse_stem
 
 STEMS = ("N001-794492-HP", "N003-794492-JG")
+BASE = "N001-794492"
+"""Published stem of ``STEMS[0]``: packaged files drop the annotator."""
 
 STAGE_FILES = {
     "refinement/final-world": ".swc",
     "refinement/final-world-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
+    "refinement/raw": ".swc",
 }
 
 
@@ -189,11 +192,14 @@ def test_build_cell_layout_writes_the_expected_tree(stage_root: Path, tmp_path: 
     stem = STEMS[0]
     cell_dir = written[parse_stem(stem)]
     assert cell_dir == output_root / f"asset_{stem}"
-    for relative in (
-        f"specimen_space_reconstructions/refined/{stem}.swc",
-        f"ccf_space_reconstructions/{stem}.swc",
-    ):
-        assert (cell_dir / relative).is_file(), relative
+    assert sorted(
+        path.relative_to(cell_dir).as_posix() for path in cell_dir.rglob("*") if path.is_file()
+    ) == [
+        f"ccf_space_reconstructions/{BASE}.swc",
+        f"raw_reconstructions/{BASE}.swc",
+        f"specimen_space_reconstructions/{BASE}.swc",
+        f"specimen_space_reconstructions/{BASE}_dense.swc",
+    ]
 
 
 def test_build_cell_layout_warns_but_continues_on_an_incomplete_cell(
@@ -242,8 +248,53 @@ def test_specimen_resampled_is_optional_until_the_resample_stage_emits_it(
 
 
 def test_both_specimen_densities_are_written(stage_root: Path, tmp_path: Path) -> None:
-    """Refined and resampled sit side by side under specimen space."""
+    """Resampled keeps the plain name and refined is marked dense, side by side."""
     written = build_cell_layout(stage_root, tmp_path / "out", _names())
-    cell_dir = written[parse_stem(STEMS[0])]
-    assert (cell_dir / f"specimen_space_reconstructions/refined/{STEMS[0]}.swc").is_file()
-    assert (cell_dir / f"specimen_space_reconstructions/resampled/{STEMS[0]}.swc").is_file()
+    specimen = written[parse_stem(STEMS[0])] / "specimen_space_reconstructions"
+    assert (specimen / f"{BASE}.swc").read_text(encoding="utf-8") == (
+        f"refinement/final-world-resampled:{STEMS[0]}"
+    )
+    assert (specimen / f"{BASE}_dense.swc").read_text(encoding="utf-8") == (
+        f"refinement/final-world:{STEMS[0]}"
+    )
+
+
+def test_raw_reconstruction_is_written(stage_root: Path, tmp_path: Path) -> None:
+    """The raw tracing gets its own folder, named like the others."""
+    written = build_cell_layout(stage_root, tmp_path / "out", _names())
+    raw = written[parse_stem(STEMS[0])] / f"raw_reconstructions/{BASE}.swc"
+    assert raw.read_text(encoding="utf-8") == f"refinement/raw:{STEMS[0]}"
+
+
+def test_a_raw_reconstruction_alone_starts_no_cell(
+    stage_root: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A neuron that never reached refinement is not published as a raw tracing alone."""
+    (stage_root / "refinement/raw/N009-794492-HP.swc").write_text("raw", encoding="utf-8")
+    with caplog.at_level(logging.INFO):
+        cells = discover_cells(stage_root)
+    assert [identifier.stem for identifier in cells] == list(STEMS)
+    assert "no other reconstruction of N009-794492-HP" in caplog.text
+
+
+def test_a_cell_without_its_raw_reconstruction_is_incomplete(stage_root: Path) -> None:
+    """The raw tracing is required, so its absence is reported."""
+    (stage_root / f"refinement/raw/{STEMS[0]}.swc").unlink()
+    cells = discover_cells(stage_root)
+    assert cells[parse_stem(STEMS[0])].missing_roles() == ("raw",)
+    assert cells[parse_stem(STEMS[1])].missing_roles() == ()
+
+
+def test_no_two_artifacts_share_a_published_path() -> None:
+    """Artifacts sharing a folder are told apart by name, so none overwrites another."""
+    reconstruction = parse_stem(STEMS[0])
+    paths = [spec.destination / spec.filename(reconstruction) for spec in ARTIFACT_SPECS]
+    assert len(set(paths)) == len(paths)
+
+
+def test_published_names_drop_the_annotator() -> None:
+    """A packaged file is named by neuron and subject, plus the artifact's name suffix."""
+    by_role = {spec.role: spec for spec in ARTIFACT_SPECS}
+    reconstruction = parse_stem(STEMS[0])
+    assert by_role["specimen_resampled"].filename(reconstruction) == f"{BASE}.swc"
+    assert by_role["specimen_refined"].filename(reconstruction) == f"{BASE}_dense.swc"

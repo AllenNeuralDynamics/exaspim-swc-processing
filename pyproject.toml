@@ -19,6 +19,9 @@ version = "0.0.0"
 dependencies = [
     "aind-data-schema>=2.5.0,<3",
     "aind-metadata-upgrader",
+    # Not on PyPI and untagged, so pinned to a commit. A direct reference rather than a
+    # [tool.uv.sources] entry, because the capsules install this library with plain pip.
+    "neuron-ng @ git+https://github.com/AllenNeuralDynamics/neuron-ng.git@92fe44fb84e7087634b0af2cce2886b6ba2faa01",
     "numpy",
 ]
 
@@ -38,6 +41,9 @@ docs = { requires-python = ">=3.12" }
 
 [tool.uv.sources]
 aind-metadata-upgrader = { git = "https://github.com/AllenNeuralDynamics/aind-metadata-upgrader.git" }
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/exaspim_swc_processing"]
