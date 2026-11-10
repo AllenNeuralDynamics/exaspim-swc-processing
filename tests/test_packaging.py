@@ -56,11 +56,12 @@ def stage_root(tmp_path: Path) -> Path:
         Root of the generated tree.
     """
     root = tmp_path / "stages"
+    swc = (RESOURCES / "reconstruction.swc").read_text(encoding="utf-8")
     for relative, suffix in STAGE_FILES.items():
         directory = root / relative
         directory.mkdir(parents=True)
         for stem in STEMS:
-            (directory / f"{stem}{suffix}").write_text(f"{relative}:{stem}", encoding="utf-8")
+            (directory / f"{stem}{suffix}").write_text(swc, encoding="utf-8")
     return root
 
 
@@ -315,3 +316,96 @@ def test_quality_control_for_an_unknown_cell_is_reported(
         )
     assert not any(cell.has_quality_control for cell in result.packaged)
     assert "Quality control for N999-794492-HP matches no reconstruction" in caplog.text
+
+
+CCF_SOURCE = "ccf_space_reconstructions/reconstructions.precomputed"
+SPECIMEN_SOURCE = "specimen_space_reconstructions/reconstructions.precomputed"
+
+
+def test_each_cell_gets_a_precomputed_source_per_space(stage_root: Path, tmp_path: Path) -> None:
+    """Both coordinate spaces can be opened in Neuroglancer from the asset."""
+    result = _package(stage_root, tmp_path)
+    for cell in result.packaged:
+        assert cell.precomputed == ("ccf", "specimen_resampled")
+        for source in (CCF_SOURCE, SPECIMEN_SOURCE):
+            assert (cell.directory / source / "info").is_file()
+            assert (cell.directory / source / "1").is_file()
+
+
+def test_a_cell_without_a_resampled_tracing_has_no_specimen_source(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """The resampled specimen tracing is optional; its source is skipped without it."""
+    (stage_root / f"refinement/final-world-resampled/{STEMS[0]}.swc").unlink()
+    result = _package(stage_root, tmp_path)
+    assert result.packaged[0].precomputed == ("ccf",)
+    assert not (result.packaged[0].directory / SPECIMEN_SOURCE).exists()
+
+
+def _linked_quality_control() -> QualityControl:
+    """Load the QC fixture with its first two metrics linking the CCF and specimen sources.
+
+    Returns
+    -------
+    QualityControl
+        The record, with references as the QC capsule writes them before packaging.
+    """
+    payload = json.loads((RESOURCES / "quality_control.json").read_text(encoding="utf-8"))
+    payload["metrics"][0]["reference"] = (
+        f"js:neuroglancer?skeleton={CCF_SOURCE}&segments=1&action=goto:5000,3000,4000"
+    )
+    payload["metrics"][1]["reference"] = f"js:neuroglancer?skeleton={SPECIMEN_SOURCE}&segments=1"
+    return QualityControl.model_validate(payload)
+
+
+@pytest.mark.parametrize("destination", ["s3://aind-open-data/", "s3://bucket/run-1"])
+def test_quality_control_links_the_published_sources(
+    stage_root: Path, tmp_path: Path, destination: str
+) -> None:
+    """References point at where the upload will put each source.
+
+    Parameters
+    ----------
+    stage_root : Path
+        Stage output tree.
+    tmp_path : Path
+        Temporary directory.
+    destination : str
+        Upload destination.
+    """
+    result = _package(
+        stage_root,
+        tmp_path,
+        quality_control={parse_stem(STEMS[0]): _linked_quality_control()},
+        destination=destination,
+    )
+    cell = result.packaged[0]
+    written = QualityControl.model_validate_json(
+        (cell.directory / QUALITY_CONTROL_FILENAME).read_text(encoding="utf-8")
+    )
+    asset = f"{destination.rstrip('/')}/{cell.asset_name}"
+    assert written.metrics[0].reference == (
+        f"js:neuroglancer?skeleton={asset}/{CCF_SOURCE}&segments=1&action=goto:5000,3000,4000"
+    )
+    assert written.metrics[1].reference == (
+        f"js:neuroglancer?skeleton={asset}/{SPECIMEN_SOURCE}&segments=1"
+    )
+
+
+def test_a_dry_run_keeps_quality_control_links_relative(stage_root: Path, tmp_path: Path) -> None:
+    """Without a destination the asset location is unknown, so nothing is resolved."""
+    record = _linked_quality_control()
+    result = _package(stage_root, tmp_path, quality_control={parse_stem(STEMS[0]): record})
+    written = QualityControl.model_validate_json(
+        (result.packaged[0].directory / QUALITY_CONTROL_FILENAME).read_text(encoding="utf-8")
+    )
+    assert written == record
+
+
+def test_an_invalid_destination_fails_before_anything_is_written(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """A destination that would produce broken links stops the run up front."""
+    with pytest.raises(ValueError, match="s3://bucket/prefix/"):
+        _package(stage_root, tmp_path, destination="aind-open-data/")
+    assert not (tmp_path / "out").exists()

@@ -9,6 +9,7 @@ from aind_data_schema_models.data_name_patterns import DataRegex
 from exaspim_swc_processing.naming import (
     ReconstructionId,
     ReconstructionNameError,
+    asset_s3_uri,
     derived_asset_name,
     parse_stem,
 )
@@ -91,3 +92,50 @@ def test_derived_asset_name_rejects_empty_primary_asset() -> None:
     """A derived name cannot be built without the primary asset it derives from."""
     with pytest.raises(ReconstructionNameError, match="primary_asset_name is empty"):
         derived_asset_name("", parse_stem("N001-794492-HP"), CREATION_TIME)
+
+
+@pytest.mark.parametrize(
+    ("destination", "expected"),
+    [
+        ("s3://aind-open-data/", "s3://aind-open-data/asset"),
+        ("s3://aind-open-data", "s3://aind-open-data/asset"),
+        ("s3://bucket/some/prefix/", "s3://bucket/some/prefix/asset"),
+        ("s3://bucket//prefix", "s3://bucket/prefix/asset"),
+    ],
+)
+def test_asset_s3_uri_places_the_asset_under_the_prefix(destination: str, expected: str) -> None:
+    """The asset sits directly under the prefix, as the upload writes it.
+
+    Parameters
+    ----------
+    destination : str
+        Upload destination.
+    expected : str
+        URI of an asset named ``asset`` under it.
+    """
+    assert asset_s3_uri(destination, "asset") == expected
+
+
+@pytest.mark.parametrize("destination", ["", None])
+def test_asset_s3_uri_is_none_for_a_dry_run(destination: str | None) -> None:
+    """No destination means nothing is uploaded, so there is no URI.
+
+    Parameters
+    ----------
+    destination : str | None
+        A blank destination.
+    """
+    assert asset_s3_uri(destination, "asset") is None
+
+
+@pytest.mark.parametrize("destination", ["aind-open-data/", "https://bucket/prefix", "s3:///x"])
+def test_asset_s3_uri_rejects_a_destination_that_is_not_s3(destination: str) -> None:
+    """A malformed destination would publish links that point nowhere.
+
+    Parameters
+    ----------
+    destination : str
+        A destination that is not ``s3://bucket/...``.
+    """
+    with pytest.raises(ValueError, match="s3://bucket/prefix/"):
+        asset_s3_uri(destination, "asset")

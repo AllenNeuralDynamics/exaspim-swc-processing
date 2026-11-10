@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import urlparse
 
 from aind_data_schema_models.data_name_patterns import build_data_name
 
@@ -183,3 +184,42 @@ def derived_asset_name(
         raise ReconstructionNameError("primary_asset_name is empty")
     label = f"{primary_asset_name}_{reconstruction.process_label}"
     return build_data_name(label, creation_time)
+
+
+def asset_s3_uri(destination: str | None, asset_name: str) -> str | None:
+    """Build the S3 URI an asset is uploaded to under ``destination``.
+
+    Uses the same rule as the packaging capsule's upload: the asset directory is placed
+    directly under the destination's prefix, which may be empty.
+
+    Parameters
+    ----------
+    destination : str | None
+        ``s3://bucket/prefix/`` the assets are uploaded under. Blank or ``None`` for a dry
+        run, where nothing is uploaded.
+    asset_name : str
+        Name of the asset, which is also its directory name.
+
+    Returns
+    -------
+    str | None
+        ``s3://bucket/prefix/<asset_name>`` without a trailing slash, or ``None`` for a dry
+        run.
+
+    Raises
+    ------
+    ValueError
+        If ``destination`` is not an ``s3://`` URI with a bucket.
+
+    Examples
+    --------
+    >>> asset_s3_uri("s3://aind-open-data/", "exaSPIM_123456_x")
+    's3://aind-open-data/exaSPIM_123456_x'
+    """
+    if not destination:
+        return None
+    parsed = urlparse(destination)
+    if parsed.scheme != "s3" or not parsed.netloc:
+        raise ValueError(f"Expected an s3://bucket/prefix/ destination, got {destination!r}")
+    key = "/".join(part for part in (parsed.path.strip("/"), asset_name) if part)
+    return f"s3://{parsed.netloc}/{key}"

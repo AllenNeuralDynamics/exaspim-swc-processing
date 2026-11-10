@@ -16,10 +16,18 @@ A cell's ``quality_control.json`` is written as well when a record was found for
 :mod:`~exaspim_swc_processing.quality_control`. It is optional — no file set requires it —
 so a cell without one is still packaged, and a warning is logged.
 
+Each cell also receives a Neuroglancer precomputed skeleton source per coordinate space,
+converted from its reconstructions; see :mod:`~exaspim_swc_processing.precomputed`. When the
+asset's S3 destination is given, the quality control references to those sources, which
+upstream can only give relative to the asset, are made absolute before the record is
+written.
+
 Packaging does not record itself as a
-:class:`~aind_data_schema.core.processing.DataProcess`. It changes no data -- the
+:class:`~aind_data_schema.core.processing.DataProcess`. Regrouping changes no data -- the
 reconstructions are hardlinked, byte for byte -- so a record of it would describe
 assembling the asset rather than producing the data, in a document meant for the latter.
+The precomputed conversion does produce data; the caller records it by appending
+:func:`~exaspim_swc_processing.precomputed.conversion_process` to the stage records.
 Where the parent metadata was read from is carried on ``DataDescription.tags``, which is
 indexed and therefore searchable, unlike ``output_parameters``.
 """
@@ -42,10 +50,14 @@ from exaspim_swc_processing.data_description import (
 )
 from exaspim_swc_processing.layout import ARTIFACT_SPECS, ArtifactSpec, discover_cells
 from exaspim_swc_processing.layout import write_cell_directory as _write_cell_directory
-from exaspim_swc_processing.naming import ReconstructionId
+from exaspim_swc_processing.naming import ReconstructionId, asset_s3_uri
 from exaspim_swc_processing.parent_metadata import ParentMetadata
+from exaspim_swc_processing.precomputed import write_cell_precomputed
 from exaspim_swc_processing.processing import build_cell_processing
-from exaspim_swc_processing.quality_control import QUALITY_CONTROL_FILENAME
+from exaspim_swc_processing.quality_control import (
+    QUALITY_CONTROL_FILENAME,
+    resolve_skeleton_references,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +79,15 @@ class PackagedCell:
         Name of the derived asset, which is also the directory name.
     has_quality_control : bool
         Whether a ``quality_control.json`` was written for the cell.
+    precomputed : tuple[str, ...]
+        Roles of the reconstructions converted to precomputed skeleton sources.
     """
 
     reconstruction: ReconstructionId
     directory: Path
     asset_name: str
     has_quality_control: bool = False
+    precomputed: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -118,6 +133,7 @@ def package_cells(
     specs: Sequence[ArtifactSpec] = ARTIFACT_SPECS,
     overrides: Mapping[str, object] | None = None,
     quality_control: Mapping[ReconstructionId, QualityControl] | None = None,
+    destination: str | None = None,
 ) -> PackagingResult:
     """Write every discovered cell as its own derived data asset.
 
@@ -143,6 +159,11 @@ def package_cells(
         Quality control record of each cell, typically from
         :func:`~exaspim_swc_processing.quality_control.discover_quality_control`. Cells
         without one are packaged without ``quality_control.json``.
+    destination : str | None, optional
+        ``s3://bucket/prefix/`` the cell directories will be uploaded under, used to make
+        the quality control references to each cell's precomputed skeletons absolute.
+        ``None`` (a dry run) leaves them relative to the asset. A value that is not an
+        ``s3://`` URI with a bucket raises ``ValueError`` before any cell is written.
 
     Returns
     -------
@@ -150,6 +171,7 @@ def package_cells(
         Cells written and cells skipped. A cell whose description cannot be derived is
         skipped rather than written without metadata.
     """
+    asset_s3_uri(destination, "")  # Validate up front, not after the first cell.
     specs = tuple(specs)
     record = build_cell_processing(list(stage_processes), pipeline)
     packaged: list[PackagedCell] = []
@@ -182,7 +204,8 @@ def package_cells(
             continue
 
         cell_dir = output_root / description.name
-        _write_cell_directory(cell, cell_dir, specs)
+        written = _write_cell_directory(cell, cell_dir, specs)
+        precomputed = write_cell_precomputed(written, cell_dir, reconstruction.stem)
         (cell_dir / DATA_DESCRIPTION_FILENAME).write_text(
             description.model_dump_json(indent=2), encoding="utf-8"
         )
@@ -193,10 +216,21 @@ def package_cells(
         if qc is None:
             logger.warning("No quality control for %s", reconstruction.stem)
         else:
+            qc = resolve_skeleton_references(
+                qc, asset_s3_uri(destination, description.name), cell_dir
+            )
             (cell_dir / QUALITY_CONTROL_FILENAME).write_text(
                 qc.model_dump_json(indent=2), encoding="utf-8"
             )
-        packaged.append(PackagedCell(reconstruction, cell_dir, description.name, qc is not None))
+        packaged.append(
+            PackagedCell(
+                reconstruction,
+                cell_dir,
+                description.name,
+                has_quality_control=qc is not None,
+                precomputed=tuple(precomputed),
+            )
+        )
 
     logger.info("Packaged %d cell(s), skipped %d", len(packaged), len(skipped))
     return PackagingResult(packaged=tuple(packaged), skipped=tuple(skipped))
