@@ -16,7 +16,7 @@ A cell's ``quality_control.json`` is written as well when a record was found for
 :mod:`~exaspim_swc_processing.quality_control`. It is optional — no file set requires it —
 so a cell without one is still packaged, and a warning is logged.
 
-Each cell also receives a Neuroglancer precomputed skeleton source per coordinate space,
+Each cell also receives a Neuroglancer precomputed skeleton source per reconstruction folder,
 converted from its reconstructions; see :mod:`~exaspim_swc_processing.precomputed`. When the
 asset's S3 destination is given, the quality control references to those sources, which
 upstream can only give relative to the asset, are made absolute before the record is
@@ -205,7 +205,7 @@ def package_cells(
 
         cell_dir = output_root / description.name
         written = _write_cell_directory(cell, cell_dir, specs)
-        precomputed = write_cell_precomputed(written, cell_dir, reconstruction.stem)
+        precomputed = write_cell_precomputed(written, cell_dir, reconstruction.published_stem)
         (cell_dir / DATA_DESCRIPTION_FILENAME).write_text(
             description.model_dump_json(indent=2), encoding="utf-8"
         )

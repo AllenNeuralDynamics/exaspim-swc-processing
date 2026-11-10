@@ -27,8 +27,12 @@ STAGE_FILES = {
     "refinement/final-world": ".swc",
     "refinement/final-world-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
+    "refinement/raw": ".swc",
 }
 CREATION_TIME = datetime(2026, 8, 19, 22, 10, 2, tzinfo=timezone.utc)
+CCF_SOURCE = "ccf_space_reconstructions/reconstructions.precomputed"
+SPECIMEN_SOURCE = "specimen_space_reconstructions/reconstructions.precomputed"
+RAW_SOURCE = "raw_reconstructions/reconstructions.precomputed"
 PIPELINE = Code(
     url="https://github.com/peter-grotz/exaspim-swc-processing-pipeline",
     name="exaspim-swc-processing",
@@ -183,12 +187,23 @@ def test_fallback_source_is_tagged_for_later_rederivation(stage_root: Path, tmp_
 def test_reconstructions_are_written_alongside_the_metadata(
     stage_root: Path, tmp_path: Path
 ) -> None:
-    """The asset holds the data as well as the description of it."""
+    """The asset holds the data as well as the description of it, named without initials."""
     result = _package(stage_root, tmp_path)
     cell = result.packaged[0]
-    stem = cell.reconstruction.stem
-    assert (cell.directory / f"specimen_space_reconstructions/refined/{stem}.swc").is_file()
-    assert (cell.directory / f"ccf_space_reconstructions/{stem}.swc").is_file()
+    entries = {
+        path.relative_to(cell.directory).as_posix()
+        for path in cell.directory.rglob("*")
+        if path.suffix == ".swc" or path.name == "reconstructions.precomputed"
+    }
+    assert entries == {
+        "ccf_space_reconstructions/N001-794492.swc",
+        CCF_SOURCE,
+        "specimen_space_reconstructions/N001-794492.swc",
+        "specimen_space_reconstructions/N001-794492_dense.swc",
+        SPECIMEN_SOURCE,
+        "raw_reconstructions/N001-794492.swc",
+        RAW_SOURCE,
+    }
 
 
 def test_a_cell_whose_description_cannot_be_derived_is_skipped(
@@ -318,18 +333,24 @@ def test_quality_control_for_an_unknown_cell_is_reported(
     assert "Quality control for N999-794492-HP matches no reconstruction" in caplog.text
 
 
-CCF_SOURCE = "ccf_space_reconstructions/reconstructions.precomputed"
-SPECIMEN_SOURCE = "specimen_space_reconstructions/reconstructions.precomputed"
-
-
 def test_each_cell_gets_a_precomputed_source_per_space(stage_root: Path, tmp_path: Path) -> None:
-    """Both coordinate spaces can be opened in Neuroglancer from the asset."""
+    """Every reconstruction folder can be opened in Neuroglancer from the asset."""
     result = _package(stage_root, tmp_path)
     for cell in result.packaged:
-        assert cell.precomputed == ("ccf", "specimen_resampled")
-        for source in (CCF_SOURCE, SPECIMEN_SOURCE):
+        assert cell.precomputed == ("ccf", "specimen_resampled", "raw")
+        for source in (CCF_SOURCE, SPECIMEN_SOURCE, RAW_SOURCE):
             assert (cell.directory / source / "info").is_file()
             assert (cell.directory / source / "1").is_file()
+
+
+def test_segments_are_labelled_without_initials(stage_root: Path, tmp_path: Path) -> None:
+    """The label Neuroglancer shows matches the packaged file names."""
+    cell = _package(stage_root, tmp_path).packaged[0]
+    properties = json.loads(
+        (cell.directory / CCF_SOURCE / "segment_properties" / "info").read_text(encoding="utf-8")
+    )
+    label = next(p for p in properties["inline"]["properties"] if p["id"] == "label")
+    assert label["values"] == ["N001-794492"]
 
 
 def test_a_cell_without_a_resampled_tracing_has_no_specimen_source(
@@ -338,12 +359,12 @@ def test_a_cell_without_a_resampled_tracing_has_no_specimen_source(
     """The resampled specimen tracing is optional; its source is skipped without it."""
     (stage_root / f"refinement/final-world-resampled/{STEMS[0]}.swc").unlink()
     result = _package(stage_root, tmp_path)
-    assert result.packaged[0].precomputed == ("ccf",)
+    assert result.packaged[0].precomputed == ("ccf", "raw")
     assert not (result.packaged[0].directory / SPECIMEN_SOURCE).exists()
 
 
 def _linked_quality_control() -> QualityControl:
-    """Load the QC fixture with its first two metrics linking the CCF and specimen sources.
+    """Load the QC fixture with its first three metrics linking the CCF, specimen and raw sources.
 
     Returns
     -------
@@ -355,6 +376,7 @@ def _linked_quality_control() -> QualityControl:
         f"js:neuroglancer?skeleton={CCF_SOURCE}&segments=1&action=goto:5000,3000,4000"
     )
     payload["metrics"][1]["reference"] = f"js:neuroglancer?skeleton={SPECIMEN_SOURCE}&segments=1"
+    payload["metrics"][2]["reference"] = f"js:neuroglancer?skeleton={RAW_SOURCE}&segments=1"
     return QualityControl.model_validate(payload)
 
 
@@ -389,6 +411,9 @@ def test_quality_control_links_the_published_sources(
     )
     assert written.metrics[1].reference == (
         f"js:neuroglancer?skeleton={asset}/{SPECIMEN_SOURCE}&segments=1"
+    )
+    assert written.metrics[2].reference == (
+        f"js:neuroglancer?skeleton={asset}/{RAW_SOURCE}&segments=1"
     )
 
 

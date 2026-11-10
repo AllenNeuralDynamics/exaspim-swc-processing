@@ -1,18 +1,20 @@
 """Write each cell's reconstructions as Neuroglancer precomputed skeletons.
 
-Neuroglancer cannot read SWC, so each coordinate space a cell is published in also gets a
-standalone precomputed skeleton source, written with
+Neuroglancer cannot read SWC, so each reconstruction folder of a cell also gets a standalone
+precomputed skeleton source, written with
 `neuron-ng <https://github.com/AllenNeuralDynamics/neuron-ng>`_ beside the SWCs it is made
 from::
 
     ccf_space_reconstructions/reconstructions.precomputed/
     specimen_space_reconstructions/reconstructions.precomputed/
+    raw_reconstructions/reconstructions.precomputed/
 
 Each source holds the cell's one reconstruction as segment :data:`SEGMENT_ID`, labelled with
-its stem, and carries the SWC compartment code as a vertex attribute so a viewer can colour
-by it. The CCF source is built from the CCF tracing and the specimen source from the
-resampled specimen tracing. Both are in micrometers, so the source transform is a plain
-micrometer-to-nanometer scale and the coordinates match the SWCs node for node.
+its published stem, and carries the SWC compartment code as a vertex attribute so a viewer
+can colour by it. The CCF source is built from the CCF tracing, the specimen source from the
+resampled specimen tracing and the raw source from the raw tracing. All are in micrometers,
+so the source transform is a plain micrometer-to-nanometer scale and the coordinates match
+the SWCs node for node.
 
 Every asset holds one neuron, at the same relative paths, so quality control evaluated before
 the asset is named can already point at a source by its asset-relative path; packaging then
@@ -82,8 +84,9 @@ PRECOMPUTED_SPECS: tuple[PrecomputedSpec, ...] = (
         "specimen_resampled",
         PurePosixPath("specimen_space_reconstructions", PRECOMPUTED_DIRNAME),
     ),
+    PrecomputedSpec("raw", PurePosixPath("raw_reconstructions", PRECOMPUTED_DIRNAME)),
 )
-"""Sources written into each cell directory, one per coordinate space."""
+"""Sources written into each cell directory, one per reconstruction folder."""
 
 
 def write_precomputed(swc: Path, out_dir: Path, label: str) -> None:
@@ -138,7 +141,7 @@ def write_cell_precomputed(
     cell_dir : Path
         The cell directory.
     label : str
-        Segment label, typically the reconstruction stem.
+        Segment label, typically the reconstruction's published stem.
     specs : Iterable[PrecomputedSpec], optional
         Sources to write, by default :data:`PRECOMPUTED_SPECS`.
 

@@ -4,13 +4,23 @@ The pipeline stages each write a flat directory holding every neuron of a subjec
 outputs for a single cell are scattered across several directories that share only the file
 stem. This module inverts that: it indexes the stage outputs by
 :class:`~exaspim_swc_processing.naming.ReconstructionId` and materialises one self-contained
-directory per cell, laid out as an AIND derived data asset.
+directory per cell, laid out as an AIND derived data asset::
 
-Specimen-space reconstructions are published in physical coordinates (microns) at two
-densities: ``refined`` is the full-resolution tracing and ``resampled`` is the sparser form
-produced alongside the CCF resampling. The upstream ``final-voxel`` outputs are not carried.
+    ccf_space_reconstructions/<neuron>-<subject>.swc
+    specimen_space_reconstructions/<neuron>-<subject>.swc        # resampled
+    specimen_space_reconstructions/<neuron>-<subject>_dense.swc  # refined
+    raw_reconstructions/<neuron>-<subject>.swc
 
-``specimen_resampled`` is optional.
+Packaged files are named by :attr:`~exaspim_swc_processing.naming.ReconstructionId.published_stem`,
+without the annotator. Specimen-space reconstructions are published in physical coordinates
+(microns) at two densities: the resampled form, produced alongside the CCF resampling, is the
+main one and keeps the plain name; the full-resolution refined tracing is marked ``_dense``.
+The raw reconstruction is the tracing before refinement, also in microns. The upstream
+``final-voxel`` outputs are not carried.
+
+``specimen_resampled`` is optional. ``raw`` is only attached to a cell found from its other
+reconstructions, so a neuron that never reached refinement is not published as a raw tracing
+alone.
 
 Stage outputs are never modified; artifacts are hardlinked where the filesystem allows it and
 copied otherwise, so a run costs little beyond the directory entries.
@@ -47,6 +57,12 @@ class ArtifactSpec:
         File extension the artifact is found and written with, including the leading dot.
     required : bool
         Whether a cell is considered incomplete when this artifact is absent.
+    name_suffix : str
+        Text added to the published stem before the extension, telling apart artifacts that
+        share a destination directory.
+    attach_only : bool
+        Whether the artifact is only added to cells found from other artifacts. Its files
+        never start a cell of their own.
     """
 
     role: str
@@ -54,6 +70,24 @@ class ArtifactSpec:
     destination: PurePosixPath
     suffix: str
     required: bool
+    name_suffix: str = ""
+    attach_only: bool = False
+
+    def filename(self, reconstruction: ReconstructionId) -> str:
+        """Name the artifact is written under in a cell directory.
+
+        Parameters
+        ----------
+        reconstruction : ReconstructionId
+            The cell the artifact belongs to.
+
+        Returns
+        -------
+        str
+            The published stem, then :attr:`name_suffix` and :attr:`suffix`, e.g.
+            ``"N001-123456_dense.swc"``.
+        """
+        return f"{reconstruction.published_stem}{self.name_suffix}{self.suffix}"
 
 
 def _spec(
@@ -63,6 +97,8 @@ def _spec(
     suffix: str = ".swc",
     *,
     required: bool = True,
+    name_suffix: str = "",
+    attach_only: bool = False,
 ) -> ArtifactSpec:
     """Build an :class:`ArtifactSpec` from string paths.
 
@@ -78,6 +114,11 @@ def _spec(
         File extension including the leading dot, by default ``".swc"``.
     required : bool, optional
         Whether absence makes a cell incomplete, by default ``True``.
+    name_suffix : str, optional
+        Text added to the published stem before the extension, by default none.
+    attach_only : bool, optional
+        Whether the artifact only joins cells found from other artifacts, by default
+        ``False``.
 
     Returns
     -------
@@ -90,6 +131,8 @@ def _spec(
         destination=PurePosixPath(destination),
         suffix=suffix,
         required=required,
+        name_suffix=name_suffix,
+        attach_only=attach_only,
     )
 
 
@@ -97,18 +140,25 @@ ARTIFACT_SPECS: tuple[ArtifactSpec, ...] = (
     _spec(
         "specimen_refined",
         ("refinement/final-world", "swc_refinement/final-world", "final-world"),
-        "specimen_space_reconstructions/refined",
+        "specimen_space_reconstructions",
+        name_suffix="_dense",
     ),
     _spec(
         "specimen_resampled",
         ("refinement/final-world-resampled",),
-        "specimen_space_reconstructions/resampled",
+        "specimen_space_reconstructions",
         required=False,
     ),
     _spec(
         "ccf",
         ("final/ccf_space_reconstructions/swcs", "ccf_space_reconstructions/swcs"),
         "ccf_space_reconstructions",
+    ),
+    _spec(
+        "raw",
+        ("refinement/raw", "swc_refinement/raw"),
+        "raw_reconstructions",
+        attach_only=True,
     ),
 )
 """Artifacts collected into each cell directory, in the order they are placed."""
@@ -195,6 +245,8 @@ def discover_cells(
 
     Files whose stem does not follow the reconstruction naming convention are logged and
     skipped rather than aborting the scan, so one stray file cannot fail a whole run.
+    Artifacts marked :attr:`~ArtifactSpec.attach_only` are scanned last and only join cells
+    already found; a file of theirs that matches no cell is logged and skipped.
 
     Parameters
     ----------
@@ -208,7 +260,8 @@ def discover_cells(
     dict[ReconstructionId, CellArtifacts]
         Discovered cells keyed by identifier, ordered by stem.
     """
-    specs = tuple(specs)
+    # Stable sort: cell-forming artifacts first, each group in specification order.
+    specs = sorted(specs, key=lambda spec: spec.attach_only)
     discovered: dict[ReconstructionId, CellArtifacts] = {}
     for spec in specs:
         source_dir = resolve_source_dir(stage_root, spec)
@@ -225,6 +278,13 @@ def discover_cells(
                 reconstruction = parse_stem(path.stem)
             except ReconstructionNameError as error:
                 logger.warning("Skipping %s: %s", path, error)
+                continue
+            if spec.attach_only and reconstruction not in discovered:
+                logger.info(
+                    "Skipping %s: no other reconstruction of %s to package it with",
+                    path,
+                    reconstruction.stem,
+                )
                 continue
             cell = discovered.setdefault(reconstruction, CellArtifacts(reconstruction))
             cell.artifacts[spec.role] = path
@@ -279,7 +339,7 @@ def write_cell_directory(
         source = cell.artifacts.get(spec.role)
         if source is None:
             continue
-        destination = cell_dir / spec.destination / f"{cell.reconstruction.stem}{spec.suffix}"
+        destination = cell_dir / spec.destination / spec.filename(cell.reconstruction)
         place_artifact(source, destination)
         written[spec.role] = destination
     return written

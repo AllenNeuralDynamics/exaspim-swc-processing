@@ -4,6 +4,10 @@ Reconstruction files produced upstream are named ``<neuron-id>-<subject-id>-<ann
 for example ``N001-123456-HP.swc``. Every stage of the pipeline keys off that stem, so this
 module turns it into a validated value object and derives the AIND asset names built from it.
 
+The annotator identifies the upstream file only: packaged reconstructions are named
+``<neuron-id>-<subject-id>``, e.g. ``N001-123456.swc``. See
+:attr:`ReconstructionId.published_stem`.
+
 AIND asset names use ``_`` to separate tokens, so no individual token may contain one. See
 https://docs.allenneuraldynamics.org/en/latest/policies_practices/data_organization.html.
 """
@@ -63,6 +67,19 @@ class ReconstructionId:
             The stem, e.g. ``"N001-123456-HP"``.
         """
         return STEM_SEPARATOR.join((self.neuron_id, self.subject_id, self.annotator))
+
+    @property
+    def published_stem(self) -> str:
+        """Stem of the reconstruction files in the packaged asset.
+
+        The annotator is dropped: it names the upstream file, not the neuron.
+
+        Returns
+        -------
+        str
+            The stem, e.g. ``"N001-123456"``.
+        """
+        return STEM_SEPARATOR.join((self.neuron_id, self.subject_id))
 
     @property
     def process_label(self) -> str:

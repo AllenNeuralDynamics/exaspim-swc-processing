@@ -30,6 +30,11 @@ def test_parse_stem_round_trips_through_stem_property() -> None:
     assert parse_stem("N067-794492-JT").stem == "N067-794492-JT"
 
 
+def test_published_stem_drops_the_annotator() -> None:
+    """Packaged files are named by neuron and subject only."""
+    assert parse_stem("N024-841260-DR").published_stem == "N024-841260"
+
+
 @pytest.mark.parametrize("stem", ["N001-794492", "N001", "N001-794492-HP-extra", ""])
 def test_parse_stem_rejects_wrong_token_count(stem: str) -> None:
     """A stem without exactly three tokens is rejected."""

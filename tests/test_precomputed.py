@@ -53,7 +53,7 @@ def _decode(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
     return xyz, edges, radius, compartment
 
 
-def _written(cell_dir: Path, roles: tuple[str, ...] = ("ccf", "specimen_resampled")) -> dict:
+def _written(cell_dir: Path, roles: tuple[str, ...] = ("ccf", "specimen_resampled", "raw")) -> dict:
     """Place the fixture SWC in a cell directory under each role, as packaging does.
 
     Parameters
@@ -122,14 +122,15 @@ def test_an_invalid_swc_writes_nothing(tmp_path: Path) -> None:
 
 
 def test_each_space_gets_its_source(tmp_path: Path) -> None:
-    """CCF and specimen sources are written beside their SWCs; the refined SWC is not used."""
-    written = _written(tmp_path, ("ccf", "specimen_refined", "specimen_resampled"))
+    """CCF, specimen and raw sources are written beside their SWCs; refined is not used."""
+    written = _written(tmp_path, ("ccf", "specimen_refined", "specimen_resampled", "raw"))
     sources = write_cell_precomputed(written, tmp_path, STEM)
     assert sources == {
         "ccf": tmp_path / "ccf_space_reconstructions" / "reconstructions.precomputed",
         "specimen_resampled": (
             tmp_path / "specimen_space_reconstructions" / "reconstructions.precomputed"
         ),
+        "raw": tmp_path / "raw_reconstructions" / "reconstructions.precomputed",
     }
     for source in sources.values():
         assert (source / "info").is_file()
@@ -137,6 +138,7 @@ def test_each_space_gets_its_source(tmp_path: Path) -> None:
     assert [str(spec.destination) for spec in PRECOMPUTED_SPECS] == [
         "ccf_space_reconstructions/reconstructions.precomputed",
         "specimen_space_reconstructions/reconstructions.precomputed",
+        "raw_reconstructions/reconstructions.precomputed",
     ]
 
 
@@ -158,7 +160,7 @@ def test_an_unreadable_reconstruction_is_skipped(
     written["ccf"].write_text("not an swc", encoding="utf-8")
     with caplog.at_level(logging.WARNING):
         sources = write_cell_precomputed(written, tmp_path, STEM)
-    assert set(sources) == {"specimen_resampled"}
+    assert set(sources) == {"specimen_resampled", "raw"}
     assert not (tmp_path / "ccf_space_reconstructions").exists()
     assert "Could not convert" in caplog.text
 
